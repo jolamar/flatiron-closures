@@ -1,25 +1,28 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Boulder Wildlife Access Records</title>
-  <meta name="description" content="City of Boulder wildlife access records with search and filter." />
+  <title>Boulder OSMP Access Map</title>
+  <meta name="description" content="Search and map Boulder OSMP climbing access features with open/closed status." />
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
-      --bg: #0b1020;
-      --panel: rgba(18, 25, 46, 0.82);
-      --panel-2: rgba(26, 35, 61, 0.9);
-      --text: #eaf0ff;
-      --muted: #aab6d6;
-      --border: rgba(170, 182, 214, 0.18);
+      --bg: #07111f;
+      --panel: rgba(15, 23, 42, 0.84);
+      --panel-2: rgba(21, 31, 52, 0.9);
+      --text: #edf4ff;
+      --muted: #a8b4cc;
+      --border: rgba(168, 180, 204, 0.18);
       --accent: #7dd3fc;
-      --accent-2: #a78bfa;
-      --danger: #fb7185;
       --good: #4ade80;
-      --shadow: 0 20px 60px rgba(0,0,0,.25);
-      --radius: 20px;
+      --bad: #fb7185;
+      --warn: #fbbf24;
+      --shadow: 0 22px 60px rgba(0,0,0,.26);
+      --radius: 22px;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -27,24 +30,15 @@
       margin: 0;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background:
-              radial-gradient(circle at top left, rgba(125,211,252,.14), transparent 35%),
-              radial-gradient(circle at top right, rgba(167,139,250,.14), transparent 30%),
-              linear-gradient(180deg, #09101d 0%, #0b1020 100%);
+              radial-gradient(circle at top left, rgba(125, 211, 252, .12), transparent 34%),
+              radial-gradient(circle at top right, rgba(167, 139, 250, .13), transparent 30%),
+              linear-gradient(180deg, #06101d 0%, #07111f 100%);
       color: var(--text);
     }
     a { color: inherit; }
-    .shell {
-      max-width: 1380px;
-      margin: 0 auto;
-      padding: 24px;
-    }
-    .hero {
-      display: grid;
-      gap: 18px;
-      grid-template-columns: 1.35fr .85fr;
-      align-items: stretch;
-      margin-bottom: 20px;
-    }
+    .shell { max-width: 1520px; margin: 0 auto; padding: 22px; }
+    .hero { display: grid; grid-template-columns: 1.35fr .95fr; gap: 16px; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(340px, .8fr); gap: 16px; align-items: start; }
     .card {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -52,178 +46,119 @@
       box-shadow: var(--shadow);
       backdrop-filter: blur(14px);
     }
-    .hero-main, .hero-side, .controls, .table-card, .detail-card, .error-card, .loading-card {
-      padding: 20px;
-    }
+    .hero-main, .hero-side, .controls, .map-card, .detail-card, .loading-card, .error-card { padding: 20px; }
     .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      color: var(--accent);
-      font-weight: 700;
-      margin-bottom: 10px;
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 10px;
     }
-    h1 {
-      margin: 0;
-      font-size: clamp(30px, 4vw, 48px);
-      line-height: 1.05;
-      letter-spacing: -0.04em;
-    }
-    .lede {
-      margin: 12px 0 0;
-      color: var(--muted);
-      max-width: 72ch;
-      line-height: 1.6;
-      font-size: 16px;
-    }
-    .hero-side {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
+    h1 { margin: 0; font-size: clamp(31px, 4vw, 50px); line-height: 1.02; letter-spacing: -0.05em; }
+    .lede { margin: 12px 0 0; color: var(--muted); font-size: 16px; line-height: 1.6; max-width: 80ch; }
+    .hero-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
     .metric {
       background: var(--panel-2);
       border: 1px solid var(--border);
       border-radius: 18px;
       padding: 16px;
-      min-height: 110px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
+      min-height: 112px;
+      display: flex; flex-direction: column; justify-content: space-between;
     }
     .metric .label { color: var(--muted); font-size: 13px; }
     .metric .value { font-size: 30px; font-weight: 800; line-height: 1; }
     .metric .hint { color: var(--muted); font-size: 12px; }
     .controls {
-      display: grid;
-      grid-template-columns: 1.35fr repeat(3, minmax(160px, .55fr)) auto;
-      gap: 12px;
-      align-items: end;
-      margin-bottom: 16px;
+      display: grid; grid-template-columns: 1.4fr repeat(3, minmax(150px, 1fr)) auto;
+      gap: 12px; align-items: end; margin-bottom: 14px;
     }
     .field label {
-      display: block;
-      margin: 0 0 8px;
-      font-size: 12px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      font-weight: 700;
+      display: block; margin-bottom: 8px; font-size: 12px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .08em; font-weight: 700;
     }
     .field input, .field select, .btn {
-      width: 100%;
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,.04);
-      color: var(--text);
-      padding: 12px 14px;
-      font: inherit;
-      outline: none;
+      width: 100%; border-radius: 14px; border: 1px solid var(--border); background: rgba(255,255,255,.04);
+      color: var(--text); padding: 12px 14px; font: inherit; outline: none;
     }
     .field input::placeholder { color: #8c98b7; }
-    .field input:focus, .field select:focus {
-      border-color: rgba(125,211,252,.65);
-      box-shadow: 0 0 0 3px rgba(125,211,252,.12);
-    }
-    .btn {
-      cursor: pointer;
-      background: linear-gradient(135deg, rgba(125,211,252,.22), rgba(167,139,250,.22));
-      font-weight: 700;
-    }
+    .field input:focus, .field select:focus { border-color: rgba(125,211,252,.65); box-shadow: 0 0 0 3px rgba(125,211,252,.12); }
+    .btn { cursor: pointer; background: linear-gradient(135deg, rgba(125,211,252,.22), rgba(167,139,250,.22)); font-weight: 700; }
     .btn:hover { filter: brightness(1.08); }
-    .grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.5fr) minmax(320px, .7fr);
-      gap: 16px;
-      align-items: start;
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px;
+      padding: 8px 12px; background: rgba(255,255,255,.04); color: var(--text); font-size: 13px;
     }
+    .chip button { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0; font: inherit; }
+    #map {
+      width: 100%; height: 580px; border-radius: 18px; overflow: hidden; border: 1px solid var(--border); background: #0c1627;
+    }
+    .map-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .map-note { color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .legend { display: flex; gap: 10px; flex-wrap: wrap; }
+    .legend-item {
+      display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 999px;
+      padding: 7px 11px; background: rgba(255,255,255,.04); font-size: 13px; color: var(--text);
+    }
+    .legend-swatch {
+      width: 14px; height: 14px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center;
+      color: white; font-size: 10px; font-weight: 900; line-height: 1; border: 1px solid rgba(255,255,255,.18);
+    }
+    .legend-swatch.open { background: rgba(74, 222, 128, .85); }
+    .legend-swatch.closed { background: rgba(251, 113, 133, .9); }
+    .legend-swatch.other { background: #94a3b8; }
     .table-wrap { overflow: auto; border-radius: 16px; border: 1px solid var(--border); }
-    table { width: 100%; border-collapse: collapse; min-width: 980px; }
+    table { width: 100%; border-collapse: collapse; min-width: 900px; }
     thead th {
-      position: sticky; top: 0; z-index: 1;
-      background: rgba(15, 22, 40, .96);
-      color: var(--muted);
-      font-size: 12px;
-      text-align: left;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      padding: 14px 14px;
+      position: sticky; top: 0; z-index: 1; background: rgba(10, 18, 32, .98); color: var(--muted);
+      font-size: 12px; text-align: left; text-transform: uppercase; letter-spacing: .08em; padding: 14px;
       border-bottom: 1px solid var(--border);
     }
-    tbody td {
-      padding: 14px;
-      border-bottom: 1px solid rgba(170,182,214,.10);
-      vertical-align: top;
-    }
-    tbody tr {
-      cursor: pointer;
-      transition: background .15s ease;
-    }
+    tbody td { padding: 14px; border-bottom: 1px solid rgba(168, 180, 204, .10); vertical-align: top; }
+    tbody tr { cursor: pointer; transition: background .15s ease; }
     tbody tr:hover { background: rgba(255,255,255,.03); }
-    tbody tr.active { background: rgba(125,211,252,.08); }
+    tbody tr.active { background: rgba(125, 211, 252, .08); }
     .title-cell { font-weight: 800; }
     .subtle { color: var(--muted); font-size: 13px; line-height: 1.45; }
-    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
-    .chip {
-      display: inline-flex; align-items: center; gap: 6px;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 8px 12px;
-      background: rgba(255,255,255,.04);
-      color: var(--text);
-      font-size: 13px;
-    }
-    .chip button {
-      border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 0; font: inherit;
-    }
     .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: 700;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.04);
-      white-space: nowrap;
+      display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 6px 10px; font-size: 12px;
+      font-weight: 800; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); white-space: nowrap;
     }
     .pill.good { color: var(--good); }
-    .pill.warn { color: #fbbf24; }
-    .pill.bad { color: var(--danger); }
+    .pill.bad { color: var(--bad); }
+    .pill.warn { color: var(--warn); }
     .stack { display: grid; gap: 12px; }
     .detail-card h2 { margin: 0 0 8px; font-size: 22px; }
     .kv { display: grid; gap: 10px; margin-top: 16px; }
     .kv-row {
-      padding: 12px 0;
-      border-top: 1px solid rgba(170,182,214,.12);
-      display: grid;
-      gap: 6px;
+      padding: 12px 0; border-top: 1px solid rgba(168,180,204,.12); display: grid; gap: 6px;
     }
     .kv-row:first-child { border-top: 0; padding-top: 0; }
     .kv-row .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
     .kv-row .v { line-height: 1.55; }
     .footer-note { margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 1.5; }
-    .empty, .loading-card, .error-card {
-      color: var(--muted);
-      text-align: center;
-      padding: 36px 20px;
-    }
+    .empty, .loading-card, .error-card { color: var(--muted); text-align: center; padding: 36px 20px; }
     .error-card { color: #fecaca; }
-    .muted-link { color: var(--accent); text-decoration: none; }
-    .muted-link:hover { text-decoration: underline; }
-    @media (max-width: 1100px) {
+    .marker {
+      width: 28px; height: 28px; border-radius: 999px; border: 2px solid rgba(255,255,255,.9);
+      display: flex; align-items: center; justify-content: center; color: white; font-weight: 900; font-size: 15px;
+      box-shadow: 0 8px 18px rgba(0,0,0,.35);
+    }
+    .marker.open { background: var(--good); }
+    .marker.closed { background: var(--bad); }
+    .marker.other { background: #94a3b8; }
+    .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: rgba(15, 23, 42, .98); color: var(--text); }
+    .popup-title { font-weight: 800; margin-bottom: 4px; }
+    .popup-sub { color: var(--muted); font-size: 13px; }
+    @media (max-width: 1120px) {
       .hero, .grid { grid-template-columns: 1fr; }
       .controls { grid-template-columns: 1fr 1fr; }
+      #map { height: 460px; }
     }
     @media (max-width: 700px) {
       .shell { padding: 14px; }
-      .hero-main, .hero-side, .controls, .table-card, .detail-card, .error-card, .loading-card { padding: 16px; }
+      .hero-main, .hero-side, .controls, .map-card, .detail-card, .loading-card, .error-card { padding: 16px; }
       .hero-side { grid-template-columns: 1fr; }
       .controls { grid-template-columns: 1fr; }
+      #map { height: 380px; }
     }
   </style>
 </head>
@@ -231,38 +166,33 @@
 <div id="app" class="shell">
   <div class="hero">
     <section class="card hero-main">
-      <div class="eyebrow">City of Boulder • OSMP</div>
-      <h1>Wildlife access records</h1>
+      <div class="eyebrow">City of Boulder OSMP</div>
+      <h1>Boulder access map</h1>
       <p class="lede">
-        Search all access records, narrow the list with filters, and open each record for details.
-        Records with `ClosureActive = N` are shown as Open, and `ClosureActive = Y` are shown as Closed.
+        Search every feature, filter the list, and watch the map update with matching results.
+        Closed polygon features draw as red or pink areas, while open features stay green based on <code>ClosureActive</code>.
       </p>
     </section>
     <section class="card hero-side">
       <div class="metric">
-        <div class="label">Visible records</div>
+        <div class="label">Visible features</div>
         <div class="value">{{ filteredFeatures.length }}</div>
         <div class="hint">of {{ features.length }} loaded</div>
       </div>
       <div class="metric">
-        <div class="label">Feature types</div>
-        <div class="value">{{ typeOptions.length }}</div>
-        <div class="hint">distinct values</div>
-      </div>
-      <div class="metric">
-        <div class="label">Open records</div>
+        <div class="label">Open</div>
         <div class="value">{{ statusCounts.open }}</div>
         <div class="hint">ClosureActive = N</div>
       </div>
       <div class="metric">
-        <div class="label">Closed records</div>
+        <div class="label">Closed</div>
         <div class="value">{{ statusCounts.closed }}</div>
         <div class="hint">ClosureActive = Y</div>
       </div>
       <div class="metric">
-        <div class="label">Latest data</div>
-        <div class="value">Live</div>
-        <div class="hint">queried on page load</div>
+        <div class="label">Other</div>
+        <div class="value">{{ statusCounts.other }}</div>
+        <div class="hint">missing or unexpected status</div>
       </div>
     </section>
   </div>
@@ -270,28 +200,7 @@
   <section class="card controls">
     <div class="field">
       <label for="search">Search</label>
-      <input id="search" v-model.trim="search" type="search" placeholder="Search feature name, species, area, comments..." />
-    </div>
-    <div class="field">
-      <label for="type">Formation type</label>
-      <select id="type" v-model="typeFilter">
-        <option value="">All types</option>
-        <option v-for="type in typeOptions" :key="type" :value="type">{{ type }}</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="species">Area access</label>
-      <select id="species" v-model="speciesFilter">
-        <option value="">All areas</option>
-        <option v-for="species in speciesOptions" :key="species" :value="species">{{ species }}</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="manager">Owner</label>
-      <select id="manager" v-model="managerFilter">
-        <option value="">All owners</option>
-        <option v-for="mgr in managerOptions" :key="mgr" :value="mgr">{{ mgr }}</option>
-      </select>
+      <input id="search" v-model.trim="search" type="search" placeholder="Search Fifth Flatiron, Boulder Flatirons, comments, area, owner..." />
     </div>
     <div class="field">
       <label for="status">Status</label>
@@ -300,87 +209,82 @@
         <option v-for="status in statusOptions" :key="status" :value="status">{{ status }}</option>
       </select>
     </div>
+    <div class="field">
+      <label for="owner">Owner</label>
+      <select id="owner" v-model="ownerFilter">
+        <option value="">All owners</option>
+        <option v-for="owner in ownerOptions" :key="owner" :value="owner">{{ owner }}</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="area">Area access</label>
+      <select id="area" v-model="areaFilter">
+        <option value="">All areas</option>
+        <option v-for="area in areaOptions" :key="area" :value="area">{{ area }}</option>
+      </select>
+    </div>
     <button class="btn" @click="resetFilters">Reset</button>
   </section>
 
-  <div class="chips" v-if="hasActiveFilters" style="margin-bottom: 16px;">
-    <span class="chip" v-if="search">Search: <strong>{{ search }}</strong> <button @click="search=''">×</button></span>
-    <span class="chip" v-if="typeFilter">Type: <strong>{{ typeFilter }}</strong> <button @click="typeFilter=''">×</button></span>
-    <span class="chip" v-if="speciesFilter">Area access: <strong>{{ speciesFilter }}</strong> <button @click="speciesFilter=''">×</button></span>
-    <span class="chip" v-if="managerFilter">Owner: <strong>{{ managerFilter }}</strong> <button @click="managerFilter=''">×</button></span>
-    <span class="chip" v-if="statusFilter">Status: <strong>{{ statusFilter }}</strong> <button @click="statusFilter=''">×</button></span>
+  <div class="chips" v-if="hasActiveFilters">
+    <span class="chip" v-if="search">Search: <strong>{{ search }}</strong> <button @click="search = ''">×</button></span>
+    <span class="chip" v-if="statusFilter">Status: <strong>{{ statusFilter }}</strong> <button @click="statusFilter = ''">×</button></span>
+    <span class="chip" v-if="ownerFilter">Owner: <strong>{{ ownerFilter }}</strong> <button @click="ownerFilter = ''">×</button></span>
+    <span class="chip" v-if="areaFilter">Area: <strong>{{ areaFilter }}</strong> <button @click="areaFilter = ''">×</button></span>
   </div>
 
   <section v-if="loading" class="card loading-card">
-    Loading closure data...
+    Loading ArcGIS data...
   </section>
   <section v-else-if="error" class="card error-card">
     <strong>Could not load the ArcGIS data.</strong>
     <div style="margin-top: 8px;">{{ error }}</div>
-    <div class="footer-note">
-      The page is still usable as static HTML, but the data endpoint may be blocking requests from this browser or need a different ArcGIS query URL.
-    </div>
   </section>
   <template v-else>
     <div class="grid">
-      <section class="card table-card">
-        <div style="display:flex; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
+      <section class="card map-card">
+        <div class="map-bar">
           <div>
-            <div class="eyebrow" style="margin-bottom: 6px;">Results</div>
-            <div class="subtle">Click a row to see the full record details on the right. Records with `ClosureActive = N` show as Open.</div>
+            <div class="eyebrow" style="margin-bottom: 6px;">Map</div>
+            <div class="map-note">The map shows only the currently filtered records. Polygon features are drawn as areas and point features use pins. Click a shape or a row to open details.</div>
           </div>
-          <div class="subtle">Sorted by <strong>{{ sortLabel }}</strong></div>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-swatch open">✓</span> Open</span>
+            <span class="legend-item"><span class="legend-swatch closed">✕</span> Closed area</span>
+            <span class="legend-item"><span class="legend-swatch other">?</span> Other</span>
+          </div>
         </div>
-
-        <div v-if="filteredFeatures.length === 0" class="empty">
-          No records match the current filters.
-        </div>
-
-        <div v-else class="table-wrap">
-          <table>
-            <thead>
-            <tr>
-              <th style="min-width: 210px;">Closure</th>
-              <th style="min-width: 170px;">Type</th>
-              <th style="min-width: 170px;">Species</th>
-              <th style="min-width: 190px;">Dates</th>
-              <th style="min-width: 140px;">Managed by</th>
-              <th style="min-width: 110px;">Acres</th>
-              <th style="min-width: 130px;">Status</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr v-for="feature in filteredFeatures" :key="feature.id" :class="{ active: selectedId === feature.id }" @click="selectedId = feature.id">
-              <td>
-                <div class="title-cell">{{ recordTitle(feature.props) }}</div>
-                <div class="subtle" v-if="feature.props.Comment">{{ shortText(feature.props.Comment, 96) }}</div>
-              </td>
-              <td>{{ feature.props.FormationType || '—' }}</td>
-              <td>{{ feature.props.AreaAccess || '—' }}</td>
-              <td>{{ feature.props.AreaAccess || formatDateRange(feature.props.Date_From, feature.props.Date_To, feature.props.Dates) }}</td>
-              <td>{{ feature.props.OWNER || '—' }}</td>
-              <td>{{ feature.props.ROUTES ?? feature.props.UseRating ?? formatNumber(feature.props.ACRES) }}</td>
-              <td>
-                <span class="pill" :class="statusClass(feature.props)">{{ statusLabel(feature.props) }}</span>
-              </td>
-            </tr>
-            </tbody>
-          </table>
-        </div>
+        <div id="map"></div>
       </section>
 
       <aside class="card detail-card stack" v-if="selectedFeature">
         <div>
-          <div class="eyebrow">Selected record</div>
-          <h2>{{ recordTitle(selectedFeature.props) }}</h2>
-          <div class="chips" style="margin-top: 10px;">
+          <div class="eyebrow">Selected feature</div>
+          <h2>{{ featureName(selectedFeature.props) }}</h2>
+          <div class="chips" style="margin-top: 10px; margin-bottom: 0;">
             <span class="pill" :class="statusClass(selectedFeature.props)">{{ statusLabel(selectedFeature.props) }}</span>
-            <span class="pill">{{ selectedFeature.props.FormationType || selectedFeature.props.ClosureType || 'No type' }}</span>
-            <span class="pill" v-if="selectedFeature.props.AKA">AKA: {{ selectedFeature.props.AKA }}</span>
+            <span class="pill" v-if="selectedFeature.props.OWNER">{{ selectedFeature.props.OWNER }}</span>
+            <span class="pill" v-if="selectedFeature.props.AreaAccess">{{ selectedFeature.props.AreaAccess }}</span>
           </div>
         </div>
 
         <div class="kv">
+          <div class="kv-row">
+            <div class="k">Feature</div>
+            <div class="v">{{ featureName(selectedFeature.props) }}</div>
+          </div>
+          <div class="kv-row">
+            <div class="k">Status</div>
+            <div class="v">{{ statusLabel(selectedFeature.props) }} based on ClosureActive = {{ normalize(selectedFeature.props.ClosureActive) || 'missing' }}</div>
+          </div>
+          <div class="kv-row">
+            <div class="k">Geometry</div>
+            <div class="v">{{ selectedFeature.geometry?.type || '—' }}</div>
+          </div>
+          <div class="kv-row">
+            <div class="k">Owner</div>
+            <div class="v">{{ selectedFeature.props.OWNER || '—' }}</div>
+          </div>
           <div class="kv-row">
             <div class="k">Area access</div>
             <div class="v">{{ selectedFeature.props.AreaAccess || '—' }}</div>
@@ -390,36 +294,84 @@
             <div class="v">{{ selectedFeature.props.FormationType || '—' }}</div>
           </div>
           <div class="kv-row">
-            <div class="k">Owner</div>
-            <div class="v">{{ selectedFeature.props.OWNER || '—' }}</div>
-          </div>
-          <div class="kv-row">
             <div class="k">Routes</div>
             <div class="v">{{ selectedFeature.props.ROUTES ?? '—' }}</div>
           </div>
           <div class="kv-row">
-            <div class="k">Display</div>
-            <div class="v">{{ selectedFeature.props.Display || '—' }}</div>
-          </div>
-          <div class="kv-row" v-if="selectedFeature.props.URL">
-            <div class="k">Reference URL</div>
-            <div class="v"><a class="muted-link" :href="selectedFeature.props.URL" target="_blank" rel="noopener">Open source record</a></div>
+            <div class="k">Seasonal closure</div>
+            <div class="v">{{ selectedFeature.props.SeasonalClosure || '—' }}</div>
           </div>
           <div class="kv-row">
-            <div class="k">Source fields</div>
+            <div class="k">HCA</div>
+            <div class="v">{{ selectedFeature.props.HCA || '—' }}</div>
+          </div>
+          <div class="kv-row" v-if="selectedFeature.props.AKA">
+            <div class="k">AKA</div>
+            <div class="v">{{ selectedFeature.props.AKA }}</div>
+          </div>
+          <div class="kv-row">
+            <div class="k">Raw fields</div>
             <div class="v subtle">{{ selectedFieldList }}</div>
           </div>
         </div>
         <div class="footer-note">
-          Tip: this page is designed for GitHub Pages. Replace the dataset URL in the script with another ArcGIS query if Boulder changes the layer.
+          Hosted as static HTML for GitHub Pages. The map uses the ArcGIS GeoJSON response and updates whenever the search or filters change.
         </div>
       </aside>
+
+      <aside class="card detail-card stack empty" v-else>
+        No feature selected.
+      </aside>
     </div>
+
+    <section class="card detail-card" style="margin-top: 16px;">
+      <div class="map-bar" style="margin-bottom: 10px;">
+        <div>
+          <div class="eyebrow" style="margin-bottom: 6px;">Results</div>
+          <div class="map-note">Sorted by {{ sortLabel }}. Click a row to focus the map.</div>
+        </div>
+        <div class="field" style="min-width: 220px; margin: 0;">
+          <label for="sort">Sort by</label>
+          <select id="sort" v-model="sortBy">
+            <option value="name">Feature name</option>
+            <option value="status">Status</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Status</th>
+            <th>Owner</th>
+            <th>Area access</th>
+            <th>Geometry</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr v-for="feature in filteredFeatures" :key="feature.id" :class="{ active: feature.id === selectedId }" @click="selectFeature(feature)">
+            <td>
+              <div class="title-cell">{{ featureName(feature.props) }}</div>
+              <div class="subtle">{{ feature.props.Comment || feature.props.Comments || 'No comment' }}</div>
+            </td>
+            <td><span class="pill" :class="statusClass(feature.props)">{{ statusLabel(feature.props) }}</span></td>
+            <td>{{ feature.props.OWNER || '—' }}</td>
+            <td>{{ feature.props.AreaAccess || '—' }}</td>
+            <td>{{ feature.geometry?.type || '—' }}</td>
+          </tr>
+          <tr v-if="!filteredFeatures.length">
+            <td colspan="5" class="empty">No records match the current search and filters.</td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </template>
 </div>
 
 <script>
-  const { createApp, computed, onMounted, ref, watch } = Vue;
+  const { createApp, computed, onMounted, ref, watch, nextTick } = Vue;
 
   createApp({
     setup() {
@@ -428,11 +380,13 @@
       const features = ref([]);
       const selectedId = ref(null);
       const search = ref('');
-      const typeFilter = ref('');
-      const speciesFilter = ref('');
-      const managerFilter = ref('');
       const statusFilter = ref('');
-      const sortBy = ref('date');
+      const ownerFilter = ref('');
+      const areaFilter = ref('');
+      const sortBy = ref('name');
+      const map = ref(null);
+      const layerGroup = ref(null);
+      const layerIndex = ref(new Map());
 
       const layerUrl = 'https://gis.bouldercolorado.gov/ags_svr2/rest/services/osmp/WildlifeClosuresCurrentClimbingAccessHCA/MapServer/1/query';
 
@@ -442,63 +396,35 @@
         return String(value).trim();
       };
 
-      const parseDate = (value) => {
-        if (!value) return null;
-        const asNum = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
-        const d = new Date(asNum);
-        return Number.isNaN(d.getTime()) ? null : d;
+      const featureName = (props) => normalize(props.FEATURE) || normalize(props.ClosureName) || 'Unnamed feature';
+
+      const statusLabel = (props) => {
+        const raw = normalize(props.ClosureActive).toUpperCase();
+        if (raw === 'N') return 'Open';
+        if (raw === 'Y') return 'Closed';
+        return 'Other';
       };
 
-      const firstNonEmpty = (...values) => {
-        for (const v of values) {
-          const t = normalize(v);
-          if (t) return t;
-        }
-        return '';
+      const statusClass = (props) => {
+        const label = statusLabel(props);
+        if (label === 'Open') return 'good';
+        if (label === 'Closed') return 'bad';
+        return 'warn';
       };
 
-      const recordTitle = (props) => firstNonEmpty(props.FEATURE, props.ClosureName, props.AKA, 'Unnamed feature');
-
-      const formatDate = (value) => {
-        const d = parseDate(value);
-        if (!d) return '—';
-        return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(d);
+      const geometryType = (geom) => normalize(geom?.type);
+      const isPolygonGeometry = (geom) => {
+        const t = geometryType(geom);
+        return t === 'Polygon' || t === 'MultiPolygon';
       };
 
-      const formatDateRange = (from, to, fallback) => {
-        if (from || to) return `${formatDate(from)} → ${formatDate(to)}`;
-        return fallback || '—';
-      };
-
-      const formatNumber = (value) => {
-        const num = Number(value);
-        return Number.isFinite(num) ? new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(num) : '—';
-      };
-
-      const shortText = (value, max = 120) => {
-        const text = normalize(value);
-        if (text.length <= max) return text;
-        return text.slice(0, max - 1).trimEnd() + '…';
-      };
-
-      const toSearchBlob = (props) => {
-        return Object.values(props)
-                .map(normalize)
-                .filter(Boolean)
-                .join(' ')
-                .toLowerCase();
-      };
+      const makeSearchBlob = (props) => Object.values(props).map(normalize).filter(Boolean).join(' ').toLowerCase();
 
       const load = async () => {
         loading.value = true;
         error.value = '';
         try {
-          const params = new URLSearchParams({
-            where: '1=1',
-            outFields: '*',
-            returnGeometry: 'true',
-            f: 'geojson'
-          });
+          const params = new URLSearchParams({ where: '1=1', outFields: '*', returnGeometry: 'true', f: 'geojson' });
           const res = await fetch(`${layerUrl}?${params.toString()}`, { mode: 'cors' });
           if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
           const data = await res.json();
@@ -507,92 +433,70 @@
             id: f.id ?? f.properties?.OBJECTID ?? idx,
             props: f.properties || {},
             geometry: f.geometry || null,
-            blob: toSearchBlob(f.properties || {})
+            blob: makeSearchBlob(f.properties || {})
           }));
           selectedId.value = features.value[0]?.id ?? null;
         } catch (err) {
-          error.value = err?.message ? `${err.message}.` : 'Unknown error.';
+          error.value = err?.message ? `${err.message}` : 'Unknown error.';
         } finally {
           loading.value = false;
         }
       };
 
-      onMounted(load);
+      const uniqueSorted = (key) => computed(() => {
+        const values = new Set();
+        for (const f of features.value) {
+          const v = normalize(f.props[key]);
+          if (v) values.add(v);
+        }
+        return [...values].sort((a, b) => a.localeCompare(b));
+      });
 
-      const uniqueSorted = (key) => {
-        return computed(() => {
-          const values = new Set();
-          for (const f of features.value) {
-            const val = normalize(f.props[key]);
-            if (val) values.add(val);
-          }
-          return [...values].sort((a, b) => a.localeCompare(b));
-        });
-      };
-
-      const typeOptions = uniqueSorted('FormationType');
-      const speciesOptions = uniqueSorted('AreaAccess');
-      const managerOptions = uniqueSorted('OWNER');
-      const statusOptions = computed(() => ['Open', 'Closed'].filter((s) => features.value.some((f) => statusLabel(f.props) === s)));
-      const statusCounts = computed(() => features.value.reduce((acc, f) => {
-        const label = statusLabel(f.props);
-        acc[label.toLowerCase()] = (acc[label.toLowerCase()] || 0) + 1;
-        return acc;
-      }, { open: 0, closed: 0 }));
-
-      const hasActiveFilters = computed(() => search.value || typeFilter.value || speciesFilter.value || managerFilter.value || statusFilter.value);
+      const statusOptions = computed(() => {
+        const vals = new Set();
+        for (const f of features.value) vals.add(statusLabel(f.props));
+        return [...vals].sort((a, b) => a.localeCompare(b));
+      });
+      const ownerOptions = uniqueSorted('OWNER');
+      const areaOptions = uniqueSorted('AreaAccess');
 
       const filteredFeatures = computed(() => {
-        const q = search.value.toLowerCase();
         let list = features.value.filter((f) => {
-          if (typeFilter.value && normalize(f.props.FormationType) !== typeFilter.value) return false;
-          if (speciesFilter.value && normalize(f.props.AreaAccess) !== speciesFilter.value) return false;
-          if (managerFilter.value && normalize(f.props.OWNER) !== managerFilter.value) return false;
-          if (statusFilter.value && statusLabel(f.props) !== statusFilter.value) return false;
+          const q = search.value.toLowerCase();
           if (q && !f.blob.includes(q)) return false;
+          if (statusFilter.value && statusLabel(f.props) !== statusFilter.value) return false;
+          if (ownerFilter.value && normalize(f.props.OWNER) !== ownerFilter.value) return false;
+          if (areaFilter.value && normalize(f.props.AreaAccess) !== areaFilter.value) return false;
           return true;
         });
 
-        const byDate = (a, b) => {
-          const da = parseDate(a.props.Date_From)?.getTime() ?? Number.POSITIVE_INFINITY;
-          const db = parseDate(b.props.Date_From)?.getTime() ?? Number.POSITIVE_INFINITY;
-          return da - db;
-        };
-        const byAcres = (a, b) => (Number(b.props.ACRES) || -Infinity) - (Number(a.props.ACRES) || -Infinity);
-        const byName = (a, b) => recordTitle(a.props).localeCompare(recordTitle(b.props));
-
-        if (sortBy.value === 'size') list = list.slice().sort(byAcres);
-        else if (sortBy.value === 'name') list = list.slice().sort(byName);
-        else list = list.slice().sort(byDate);
-
+        if (sortBy.value === 'status') {
+          const order = { Open: 0, Closed: 1, Other: 2 };
+          list = list.slice().sort((a, b) => order[statusLabel(a.props)] - order[statusLabel(b.props)] || featureName(a.props).localeCompare(featureName(b.props)));
+        } else {
+          list = list.slice().sort((a, b) => featureName(a.props).localeCompare(featureName(b.props)));
+        }
         return list;
       });
 
-      watch(filteredFeatures, (list) => {
-        if (!list.some((f) => f.id === selectedId.value)) {
-          selectedId.value = list[0]?.id ?? null;
+      const statusCounts = computed(() => {
+        const counts = { open: 0, closed: 0, other: 0 };
+        for (const f of features.value) {
+          const s = statusLabel(f.props);
+          if (s === 'Open') counts.open += 1;
+          else if (s === 'Closed') counts.closed += 1;
+          else counts.other += 1;
         }
+        return counts;
       });
 
-      const selectedFeature = computed(() => filteredFeatures.value.find((f) => f.id === selectedId.value) || filteredFeatures.value[0] || features.value.find((f) => f.id === selectedId.value) || null);
+      const hasActiveFilters = computed(() => !!search.value || !!statusFilter.value || !!ownerFilter.value || !!areaFilter.value);
 
-      const isTruthy = (value) => ['yes', 'y', 'true', '1'].includes(normalize(value).toLowerCase());
-
-      const statusLabel = (props) => {
-        const active = isTruthy(props.ClosureActive);
-        return active ? 'Closed' : 'Open';
-      };
-
-      const statusClass = (props) => {
-        const label = statusLabel(props);
-        if (label === 'Closed') return 'bad';
-        return 'good';
-      };
-
-      const sortLabel = computed(() => {
-        if (sortBy.value === 'size') return 'size';
-        if (sortBy.value === 'name') return 'name';
-        return 'start date';
+      const selectedFeature = computed(() => {
+        return filteredFeatures.value.find((f) => f.id === selectedId.value)
+                || filteredFeatures.value[0]
+                || features.value.find((f) => f.id === selectedId.value)
+                || null;
       });
 
       const selectedFieldList = computed(() => {
@@ -600,12 +504,154 @@
         return Object.keys(props).filter((k) => k !== 'Shape').join(', ');
       });
 
+      const sortLabel = computed(() => sortBy.value === 'status' ? 'status' : 'feature name');
+
+      const geometryToLatLng = (geom) => {
+        if (!geom) return null;
+        if (geom.type === 'Point') return [geom.coordinates[1], geom.coordinates[0]];
+        const coords = [];
+        const walk = (node) => {
+          if (!node) return;
+          if (typeof node[0] === 'number' && typeof node[1] === 'number') {
+            coords.push([node[1], node[0]]);
+            return;
+          }
+          for (const child of node) walk(child);
+        };
+        walk(geom.coordinates);
+        if (!coords.length) return null;
+        let minLat = coords[0][0], maxLat = coords[0][0], minLng = coords[0][1], maxLng = coords[0][1];
+        for (const [lat, lng] of coords) {
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+          if (lng < minLng) minLng = lng;
+          if (lng > maxLng) maxLng = lng;
+        }
+        return [(minLat + maxLat) / 2, (minLng + maxLng) / 2];
+      };
+
+      const markerHTML = (props) => {
+        const s = statusLabel(props).toLowerCase();
+        const sym = s === 'open' ? '✓' : (s === 'closed' ? '✕' : '?');
+        return `<div class="marker ${s}">${sym}</div>`;
+      };
+
+      const makeIcon = (props) => L.divIcon({ className: '', html: markerHTML(props), iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14] });
+
+      const escapeHTML = (s) => String(s)
+              .replaceAll('&', '&amp;')
+              .replaceAll('<', '&lt;')
+              .replaceAll('>', '&gt;')
+              .replaceAll('"', '&quot;')
+              .replaceAll("'", '&#39;');
+
+      const popupContent = (f) => {
+        const name = featureName(f.props);
+        const status = statusLabel(f.props);
+        const owner = normalize(f.props.OWNER) || 'Unknown';
+        const area = normalize(f.props.AreaAccess) || 'Unknown';
+        const geom = geometryType(f.geometry) || 'Unknown geometry';
+        return `
+            <div>
+              <div class="popup-title">${escapeHTML(name)}</div>
+              <div class="popup-sub">${escapeHTML(status)} · ${escapeHTML(owner)} · ${escapeHTML(area)} · ${escapeHTML(geom)}</div>
+            </div>
+          `;
+      };
+
+      const initMap = () => {
+        if (map.value) return;
+        map.value = L.map('map', { preferCanvas: true });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map.value);
+        layerGroup.value = L.layerGroup().addTo(map.value);
+        map.value.setView([40.015, -105.270], 12);
+      };
+
+      const buildLayer = (feature) => {
+        const status = statusLabel(feature.props);
+        const geom = feature.geometry;
+        if (!geom) return null;
+
+        if (isPolygonGeometry(geom)) {
+          const style = status === 'Closed'
+                  ? { color: '#fb7185', weight: 2, opacity: 0.95, fillColor: '#fb7185', fillOpacity: 0.28 }
+                  : status === 'Open'
+                          ? { color: '#4ade80', weight: 2, opacity: 0.85, dashArray: '6 6', fillColor: '#4ade80', fillOpacity: 0.10 }
+                          : { color: '#94a3b8', weight: 2, opacity: 0.75, fillColor: '#94a3b8', fillOpacity: 0.12 };
+          const layer = L.geoJSON(geom, { style });
+          layer.bindPopup(popupContent(feature), { closeButton: true, autoPan: true });
+          layer.on('click', () => { selectedId.value = feature.id; });
+          return layer;
+        }
+
+        const latlng = geometryToLatLng(geom);
+        if (!latlng) return null;
+        const marker = L.marker(latlng, { icon: makeIcon(feature.props) });
+        marker.bindPopup(popupContent(feature), { closeButton: true, autoPan: true });
+        marker.on('click', () => { selectedId.value = feature.id; });
+        return marker;
+      };
+
+      const flyToFeature = (feature) => {
+        if (!map.value) return;
+        const layer = layerIndex.value.get(feature.id);
+        if (!layer) return;
+        if (typeof layer.getBounds === 'function') {
+          const bounds = layer.getBounds();
+          if (bounds && bounds.isValid && bounds.isValid()) map.value.fitBounds(bounds.pad(0.15), { maxZoom: 15, animate: true });
+        } else if (typeof layer.getLatLng === 'function') {
+          map.value.flyTo(layer.getLatLng(), Math.max(map.value.getZoom(), 14), { duration: 0.6 });
+        }
+        if (typeof layer.openPopup === 'function') layer.openPopup();
+      };
+
+      const refreshMapLayers = () => {
+        if (!map.value || !layerGroup.value) return;
+        layerGroup.value.clearLayers();
+        layerIndex.value = new Map();
+        const boundsGroup = L.featureGroup();
+        for (const f of filteredFeatures.value) {
+          const layer = buildLayer(f);
+          if (!layer) continue;
+          layerIndex.value.set(f.id, layer);
+          layerGroup.value.addLayer(layer);
+          boundsGroup.addLayer(layer);
+        }
+        if (boundsGroup.getLayers().length > 0) {
+          const bounds = boundsGroup.getBounds().pad(0.15);
+          if (bounds.isValid()) map.value.fitBounds(bounds, { maxZoom: 15, animate: true });
+        }
+      };
+
+      const selectFeature = (feature) => {
+        selectedId.value = feature.id;
+        flyToFeature(feature);
+      };
+
+      onMounted(async () => {
+        await load();
+        await nextTick();
+        initMap();
+        refreshMapLayers();
+      });
+
+      watch(filteredFeatures, () => {
+        refreshMapLayers();
+        const stillVisible = filteredFeatures.value.some((f) => f.id === selectedId.value);
+        if (!stillVisible) selectedId.value = filteredFeatures.value[0]?.id ?? null;
+      }, { deep: true });
+
+      watch(selectedId, (id) => {
+        const f = features.value.find((x) => x.id === id);
+        if (f && filteredFeatures.value.some((x) => x.id === id)) flyToFeature(f);
+      });
+
       const resetFilters = () => {
         search.value = '';
-        typeFilter.value = '';
-        speciesFilter.value = '';
-        managerFilter.value = '';
-        sortBy.value = 'date';
+        statusFilter.value = '';
+        ownerFilter.value = '';
+        areaFilter.value = '';
+        sortBy.value = 'name';
       };
 
       return {
@@ -615,27 +661,24 @@
         selectedId,
         selectedFeature,
         search,
-        typeFilter,
-        speciesFilter,
-        managerFilter,
         statusFilter,
+        ownerFilter,
+        areaFilter,
         sortBy,
-        typeOptions,
-        speciesOptions,
-        managerOptions,
         statusOptions,
+        ownerOptions,
+        areaOptions,
+        filteredFeatures,
         statusCounts,
         hasActiveFilters,
-        filteredFeatures,
-        sortLabel,
         selectedFieldList,
-        recordTitle,
-        formatDateRange,
-        formatNumber,
-        shortText,
+        sortLabel,
+        normalize,
+        featureName,
         statusLabel,
         statusClass,
         resetFilters,
+        selectFeature,
       };
     }
   }).mount('#app');
