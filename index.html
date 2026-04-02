@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Boulder Wildlife Closures</title>
-  <meta name="description" content="Current City of Boulder wildlife closures with search and filter." />
+  <title>Boulder Wildlife Access Records</title>
+  <meta name="description" content="City of Boulder wildlife access records with search and filter." />
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <style>
     :root {
@@ -27,9 +27,9 @@
       margin: 0;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background:
-        radial-gradient(circle at top left, rgba(125,211,252,.14), transparent 35%),
-        radial-gradient(circle at top right, rgba(167,139,250,.14), transparent 30%),
-        linear-gradient(180deg, #09101d 0%, #0b1020 100%);
+              radial-gradient(circle at top left, rgba(125,211,252,.14), transparent 35%),
+              radial-gradient(circle at top right, rgba(167,139,250,.14), transparent 30%),
+              linear-gradient(180deg, #09101d 0%, #0b1020 100%);
       color: var(--text);
     }
     a { color: inherit; }
@@ -228,384 +228,417 @@
   </style>
 </head>
 <body>
-  <div id="app" class="shell">
-    <div class="hero">
-      <section class="card hero-main">
-        <div class="eyebrow">City of Boulder • OSMP</div>
-        <h1>Current wildlife closures</h1>
-        <p class="lede">
-          Search active closure areas, narrow the list with filters, and open each record for details.
-          The data is loaded directly from Boulder’s ArcGIS service so the page can be hosted as a static GitHub Pages site.
-        </p>
-      </section>
-      <section class="card hero-side">
-        <div class="metric">
-          <div class="label">Visible closures</div>
-          <div class="value">{{ filteredFeatures.length }}</div>
-          <div class="hint">of {{ features.length }} loaded</div>
-        </div>
-        <div class="metric">
-          <div class="label">Closure types</div>
-          <div class="value">{{ typeOptions.length }}</div>
-          <div class="hint">distinct values</div>
-        </div>
-        <div class="metric">
-          <div class="label">Species</div>
-          <div class="value">{{ speciesOptions.length }}</div>
-          <div class="hint">distinct values</div>
-        </div>
-        <div class="metric">
-          <div class="label">Latest data</div>
-          <div class="value">Live</div>
-          <div class="hint">queried on page load</div>
-        </div>
-      </section>
-    </div>
-
-    <section class="card controls">
-      <div class="field">
-        <label for="search">Search</label>
-        <input id="search" v-model.trim="search" type="search" placeholder="Search closure name, species, dates, regulation, comments..." />
-      </div>
-      <div class="field">
-        <label for="type">Closure type</label>
-        <select id="type" v-model="typeFilter">
-          <option value="">All types</option>
-          <option v-for="type in typeOptions" :key="type" :value="type">{{ type }}</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="species">Species</label>
-        <select id="species" v-model="speciesFilter">
-          <option value="">All species</option>
-          <option v-for="species in speciesOptions" :key="species" :value="species">{{ species }}</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="manager">Managed by</label>
-        <select id="manager" v-model="managerFilter">
-          <option value="">All managers</option>
-          <option v-for="mgr in managerOptions" :key="mgr" :value="mgr">{{ mgr }}</option>
-        </select>
-      </div>
-      <button class="btn" @click="resetFilters">Reset</button>
+<div id="app" class="shell">
+  <div class="hero">
+    <section class="card hero-main">
+      <div class="eyebrow">City of Boulder • OSMP</div>
+      <h1>Wildlife access records</h1>
+      <p class="lede">
+        Search all access records, narrow the list with filters, and open each record for details.
+        Records with `ClosureActive = N` are shown as Open, and `ClosureActive = Y` are shown as Closed.
+      </p>
     </section>
-
-    <div class="chips" v-if="hasActiveFilters" style="margin-bottom: 16px;">
-      <span class="chip" v-if="search">Search: <strong>{{ search }}</strong> <button @click="search=''">×</button></span>
-      <span class="chip" v-if="typeFilter">Type: <strong>{{ typeFilter }}</strong> <button @click="typeFilter=''">×</button></span>
-      <span class="chip" v-if="speciesFilter">Species: <strong>{{ speciesFilter }}</strong> <button @click="speciesFilter=''">×</button></span>
-      <span class="chip" v-if="managerFilter">Managed by: <strong>{{ managerFilter }}</strong> <button @click="managerFilter=''">×</button></span>
-    </div>
-
-    <section v-if="loading" class="card loading-card">
-      Loading closure data...
-    </section>
-    <section v-else-if="error" class="card error-card">
-      <strong>Could not load the ArcGIS data.</strong>
-      <div style="margin-top: 8px;">{{ error }}</div>
-      <div class="footer-note">
-        The page is still usable as static HTML, but the data endpoint may be blocking requests from this browser or need a different ArcGIS query URL.
+    <section class="card hero-side">
+      <div class="metric">
+        <div class="label">Visible records</div>
+        <div class="value">{{ filteredFeatures.length }}</div>
+        <div class="hint">of {{ features.length }} loaded</div>
+      </div>
+      <div class="metric">
+        <div class="label">Feature types</div>
+        <div class="value">{{ typeOptions.length }}</div>
+        <div class="hint">distinct values</div>
+      </div>
+      <div class="metric">
+        <div class="label">Open records</div>
+        <div class="value">{{ statusCounts.open }}</div>
+        <div class="hint">ClosureActive = N</div>
+      </div>
+      <div class="metric">
+        <div class="label">Closed records</div>
+        <div class="value">{{ statusCounts.closed }}</div>
+        <div class="hint">ClosureActive = Y</div>
+      </div>
+      <div class="metric">
+        <div class="label">Latest data</div>
+        <div class="value">Live</div>
+        <div class="hint">queried on page load</div>
       </div>
     </section>
-    <template v-else>
-      <div class="grid">
-        <section class="card table-card">
-          <div style="display:flex; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-            <div>
-              <div class="eyebrow" style="margin-bottom: 6px;">Results</div>
-              <div class="subtle">Click a row to see the full record details on the right.</div>
-            </div>
-            <div class="subtle">Sorted by <strong>{{ sortLabel }}</strong></div>
-          </div>
-
-          <div v-if="filteredFeatures.length === 0" class="empty">
-            No closures match the current filters.
-          </div>
-
-          <div v-else class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th style="min-width: 210px;">Closure</th>
-                  <th style="min-width: 170px;">Type</th>
-                  <th style="min-width: 170px;">Species</th>
-                  <th style="min-width: 190px;">Dates</th>
-                  <th style="min-width: 140px;">Managed by</th>
-                  <th style="min-width: 110px;">Acres</th>
-                  <th style="min-width: 130px;">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="feature in filteredFeatures" :key="feature.id" :class="{ active: selectedId === feature.id }" @click="selectedId = feature.id">
-                  <td>
-                    <div class="title-cell">{{ feature.props.ClosureName || 'Unnamed closure' }}</div>
-                    <div class="subtle" v-if="feature.props.Comment">{{ shortText(feature.props.Comment, 96) }}</div>
-                  </td>
-                  <td>{{ feature.props.ClosureType || '—' }}</td>
-                  <td>{{ feature.props.Species || '—' }}</td>
-                  <td>{{ formatDateRange(feature.props.Date_From, feature.props.Date_To, feature.props.Dates) }}</td>
-                  <td>{{ feature.props.ManagedBy || '—' }}</td>
-                  <td>{{ formatNumber(feature.props.ACRES) }}</td>
-                  <td>
-                    <span class="pill" :class="statusClass(feature.props)">{{ statusLabel(feature.props) }}</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <aside class="card detail-card stack" v-if="selectedFeature">
-          <div>
-            <div class="eyebrow">Selected record</div>
-            <h2>{{ selectedFeature.props.ClosureName || 'Unnamed closure' }}</h2>
-            <div class="chips" style="margin-top: 10px;">
-              <span class="pill" :class="statusClass(selectedFeature.props)">{{ statusLabel(selectedFeature.props) }}</span>
-              <span class="pill">{{ selectedFeature.props.ClosureType || 'No type' }}</span>
-              <span class="pill" v-if="selectedFeature.props.Species">{{ selectedFeature.props.Species }}</span>
-            </div>
-          </div>
-
-          <div class="kv">
-            <div class="kv-row">
-              <div class="k">Date range</div>
-              <div class="v">{{ formatDateRange(selectedFeature.props.Date_From, selectedFeature.props.Date_To, selectedFeature.props.Dates) }}</div>
-            </div>
-            <div class="kv-row">
-              <div class="k">Regulation</div>
-              <div class="v">{{ selectedFeature.props.Regulation || '—' }}</div>
-            </div>
-            <div class="kv-row">
-              <div class="k">Managed by</div>
-              <div class="v">{{ selectedFeature.props.ManagedBy || '—' }}</div>
-            </div>
-            <div class="kv-row">
-              <div class="k">Area</div>
-              <div class="v">{{ formatNumber(selectedFeature.props.ACRES) }} acres · {{ formatNumber(selectedFeature.props.Hectares) }} hectares</div>
-            </div>
-            <div class="kv-row">
-              <div class="k">Comment</div>
-              <div class="v">{{ selectedFeature.props.Comment || '—' }}</div>
-            </div>
-            <div class="kv-row" v-if="selectedFeature.props.URL">
-              <div class="k">Reference URL</div>
-              <div class="v"><a class="muted-link" :href="selectedFeature.props.URL" target="_blank" rel="noopener">Open source record</a></div>
-            </div>
-            <div class="kv-row">
-              <div class="k">Source fields</div>
-              <div class="v subtle">{{ selectedFieldList }}</div>
-            </div>
-          </div>
-          <div class="footer-note">
-            Tip: this page is designed for GitHub Pages. Replace the dataset URL in the script with another ArcGIS query if Boulder changes the layer.
-          </div>
-        </aside>
-      </div>
-    </template>
   </div>
 
-  <script>
-    const { createApp, computed, onMounted, ref, watch } = Vue;
+  <section class="card controls">
+    <div class="field">
+      <label for="search">Search</label>
+      <input id="search" v-model.trim="search" type="search" placeholder="Search feature name, species, area, comments..." />
+    </div>
+    <div class="field">
+      <label for="type">Formation type</label>
+      <select id="type" v-model="typeFilter">
+        <option value="">All types</option>
+        <option v-for="type in typeOptions" :key="type" :value="type">{{ type }}</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="species">Area access</label>
+      <select id="species" v-model="speciesFilter">
+        <option value="">All areas</option>
+        <option v-for="species in speciesOptions" :key="species" :value="species">{{ species }}</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="manager">Owner</label>
+      <select id="manager" v-model="managerFilter">
+        <option value="">All owners</option>
+        <option v-for="mgr in managerOptions" :key="mgr" :value="mgr">{{ mgr }}</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="status">Status</label>
+      <select id="status" v-model="statusFilter">
+        <option value="">All statuses</option>
+        <option v-for="status in statusOptions" :key="status" :value="status">{{ status }}</option>
+      </select>
+    </div>
+    <button class="btn" @click="resetFilters">Reset</button>
+  </section>
 
-    createApp({
-      setup() {
-        const loading = ref(true);
-        const error = ref('');
-        const features = ref([]);
-        const selectedId = ref(null);
-        const search = ref('');
-        const typeFilter = ref('');
-        const speciesFilter = ref('');
-        const managerFilter = ref('');
-        const sortBy = ref('date');
+  <div class="chips" v-if="hasActiveFilters" style="margin-bottom: 16px;">
+    <span class="chip" v-if="search">Search: <strong>{{ search }}</strong> <button @click="search=''">×</button></span>
+    <span class="chip" v-if="typeFilter">Type: <strong>{{ typeFilter }}</strong> <button @click="typeFilter=''">×</button></span>
+    <span class="chip" v-if="speciesFilter">Area access: <strong>{{ speciesFilter }}</strong> <button @click="speciesFilter=''">×</button></span>
+    <span class="chip" v-if="managerFilter">Owner: <strong>{{ managerFilter }}</strong> <button @click="managerFilter=''">×</button></span>
+    <span class="chip" v-if="statusFilter">Status: <strong>{{ statusFilter }}</strong> <button @click="statusFilter=''">×</button></span>
+  </div>
 
-        const layerUrl = 'https://gis.bouldercolorado.gov/ags_svr2/rest/services/osmp/WildlifeClosuresCurrentClimbingAccessHCA/MapServer/5/query';
+  <section v-if="loading" class="card loading-card">
+    Loading closure data...
+  </section>
+  <section v-else-if="error" class="card error-card">
+    <strong>Could not load the ArcGIS data.</strong>
+    <div style="margin-top: 8px;">{{ error }}</div>
+    <div class="footer-note">
+      The page is still usable as static HTML, but the data endpoint may be blocking requests from this browser or need a different ArcGIS query URL.
+    </div>
+  </section>
+  <template v-else>
+    <div class="grid">
+      <section class="card table-card">
+        <div style="display:flex; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
+          <div>
+            <div class="eyebrow" style="margin-bottom: 6px;">Results</div>
+            <div class="subtle">Click a row to see the full record details on the right. Records with `ClosureActive = N` show as Open.</div>
+          </div>
+          <div class="subtle">Sorted by <strong>{{ sortLabel }}</strong></div>
+        </div>
 
-        const normalize = (value) => {
-          if (value === null || value === undefined) return '';
-          if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-          return String(value).trim();
-        };
+        <div v-if="filteredFeatures.length === 0" class="empty">
+          No records match the current filters.
+        </div>
 
-        const parseDate = (value) => {
-          if (!value) return null;
-          const asNum = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
-          const d = new Date(asNum);
-          return Number.isNaN(d.getTime()) ? null : d;
-        };
+        <div v-else class="table-wrap">
+          <table>
+            <thead>
+            <tr>
+              <th style="min-width: 210px;">Closure</th>
+              <th style="min-width: 170px;">Type</th>
+              <th style="min-width: 170px;">Species</th>
+              <th style="min-width: 190px;">Dates</th>
+              <th style="min-width: 140px;">Managed by</th>
+              <th style="min-width: 110px;">Acres</th>
+              <th style="min-width: 130px;">Status</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="feature in filteredFeatures" :key="feature.id" :class="{ active: selectedId === feature.id }" @click="selectedId = feature.id">
+              <td>
+                <div class="title-cell">{{ recordTitle(feature.props) }}</div>
+                <div class="subtle" v-if="feature.props.Comment">{{ shortText(feature.props.Comment, 96) }}</div>
+              </td>
+              <td>{{ feature.props.FormationType || '—' }}</td>
+              <td>{{ feature.props.AreaAccess || '—' }}</td>
+              <td>{{ feature.props.AreaAccess || formatDateRange(feature.props.Date_From, feature.props.Date_To, feature.props.Dates) }}</td>
+              <td>{{ feature.props.OWNER || '—' }}</td>
+              <td>{{ feature.props.ROUTES ?? feature.props.UseRating ?? formatNumber(feature.props.ACRES) }}</td>
+              <td>
+                <span class="pill" :class="statusClass(feature.props)">{{ statusLabel(feature.props) }}</span>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-        const formatDate = (value) => {
-          const d = parseDate(value);
-          if (!d) return '—';
-          return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(d);
-        };
+      <aside class="card detail-card stack" v-if="selectedFeature">
+        <div>
+          <div class="eyebrow">Selected record</div>
+          <h2>{{ recordTitle(selectedFeature.props) }}</h2>
+          <div class="chips" style="margin-top: 10px;">
+            <span class="pill" :class="statusClass(selectedFeature.props)">{{ statusLabel(selectedFeature.props) }}</span>
+            <span class="pill">{{ selectedFeature.props.FormationType || selectedFeature.props.ClosureType || 'No type' }}</span>
+            <span class="pill" v-if="selectedFeature.props.AKA">AKA: {{ selectedFeature.props.AKA }}</span>
+          </div>
+        </div>
 
-        const formatDateRange = (from, to, fallback) => {
-          if (from || to) return `${formatDate(from)} → ${formatDate(to)}`;
-          return fallback || '—';
-        };
+        <div class="kv">
+          <div class="kv-row">
+            <div class="k">Area access</div>
+            <div class="v">{{ selectedFeature.props.AreaAccess || '—' }}</div>
+          </div>
+          <div class="kv-row">
+            <div class="k">Formation type</div>
+            <div class="v">{{ selectedFeature.props.FormationType || '—' }}</div>
+          </div>
+          <div class="kv-row">
+            <div class="k">Owner</div>
+            <div class="v">{{ selectedFeature.props.OWNER || '—' }}</div>
+          </div>
+          <div class="kv-row">
+            <div class="k">Routes</div>
+            <div class="v">{{ selectedFeature.props.ROUTES ?? '—' }}</div>
+          </div>
+          <div class="kv-row">
+            <div class="k">Display</div>
+            <div class="v">{{ selectedFeature.props.Display || '—' }}</div>
+          </div>
+          <div class="kv-row" v-if="selectedFeature.props.URL">
+            <div class="k">Reference URL</div>
+            <div class="v"><a class="muted-link" :href="selectedFeature.props.URL" target="_blank" rel="noopener">Open source record</a></div>
+          </div>
+          <div class="kv-row">
+            <div class="k">Source fields</div>
+            <div class="v subtle">{{ selectedFieldList }}</div>
+          </div>
+        </div>
+        <div class="footer-note">
+          Tip: this page is designed for GitHub Pages. Replace the dataset URL in the script with another ArcGIS query if Boulder changes the layer.
+        </div>
+      </aside>
+    </div>
+  </template>
+</div>
 
-        const formatNumber = (value) => {
-          const num = Number(value);
-          return Number.isFinite(num) ? new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(num) : '—';
-        };
+<script>
+  const { createApp, computed, onMounted, ref, watch } = Vue;
 
-        const shortText = (value, max = 120) => {
-          const text = normalize(value);
-          if (text.length <= max) return text;
-          return text.slice(0, max - 1).trimEnd() + '…';
-        };
+  createApp({
+    setup() {
+      const loading = ref(true);
+      const error = ref('');
+      const features = ref([]);
+      const selectedId = ref(null);
+      const search = ref('');
+      const typeFilter = ref('');
+      const speciesFilter = ref('');
+      const managerFilter = ref('');
+      const statusFilter = ref('');
+      const sortBy = ref('date');
 
-        const toSearchBlob = (props) => {
-          return Object.values(props)
-            .map(normalize)
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
-        };
+      const layerUrl = 'https://gis.bouldercolorado.gov/ags_svr2/rest/services/osmp/WildlifeClosuresCurrentClimbingAccessHCA/MapServer/1/query';
 
-        const load = async () => {
-          loading.value = true;
-          error.value = '';
-          try {
-            const params = new URLSearchParams({
-              where: "EnactedClosure='Yes'",
-              outFields: '*',
-              returnGeometry: 'true',
-              f: 'geojson'
-            });
-            const res = await fetch(`${layerUrl}?${params.toString()}`, { mode: 'cors' });
-            if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-            const data = await res.json();
-            const feats = Array.isArray(data.features) ? data.features : [];
-            features.value = feats.map((f, idx) => ({
-              id: f.id ?? f.properties?.OBJECTID ?? idx,
-              props: f.properties || {},
-              geometry: f.geometry || null,
-              blob: toSearchBlob(f.properties || {})
-            }));
-            selectedId.value = features.value[0]?.id ?? null;
-          } catch (err) {
-            error.value = err?.message ? `${err.message}.` : 'Unknown error.';
-          } finally {
-            loading.value = false;
-          }
-        };
+      const normalize = (value) => {
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+        return String(value).trim();
+      };
 
-        onMounted(load);
+      const parseDate = (value) => {
+        if (!value) return null;
+        const asNum = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
+        const d = new Date(asNum);
+        return Number.isNaN(d.getTime()) ? null : d;
+      };
 
-        const uniqueSorted = (key) => {
-          return computed(() => {
-            const values = new Set();
-            for (const f of features.value) {
-              const val = normalize(f.props[key]);
-              if (val) values.add(val);
-            }
-            return [...values].sort((a, b) => a.localeCompare(b));
+      const firstNonEmpty = (...values) => {
+        for (const v of values) {
+          const t = normalize(v);
+          if (t) return t;
+        }
+        return '';
+      };
+
+      const recordTitle = (props) => firstNonEmpty(props.FEATURE, props.ClosureName, props.AKA, 'Unnamed feature');
+
+      const formatDate = (value) => {
+        const d = parseDate(value);
+        if (!d) return '—';
+        return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(d);
+      };
+
+      const formatDateRange = (from, to, fallback) => {
+        if (from || to) return `${formatDate(from)} → ${formatDate(to)}`;
+        return fallback || '—';
+      };
+
+      const formatNumber = (value) => {
+        const num = Number(value);
+        return Number.isFinite(num) ? new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(num) : '—';
+      };
+
+      const shortText = (value, max = 120) => {
+        const text = normalize(value);
+        if (text.length <= max) return text;
+        return text.slice(0, max - 1).trimEnd() + '…';
+      };
+
+      const toSearchBlob = (props) => {
+        return Object.values(props)
+                .map(normalize)
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+      };
+
+      const load = async () => {
+        loading.value = true;
+        error.value = '';
+        try {
+          const params = new URLSearchParams({
+            where: '1=1',
+            outFields: '*',
+            returnGeometry: 'true',
+            f: 'geojson'
           });
-        };
+          const res = await fetch(`${layerUrl}?${params.toString()}`, { mode: 'cors' });
+          if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+          const data = await res.json();
+          const feats = Array.isArray(data.features) ? data.features : [];
+          features.value = feats.map((f, idx) => ({
+            id: f.id ?? f.properties?.OBJECTID ?? idx,
+            props: f.properties || {},
+            geometry: f.geometry || null,
+            blob: toSearchBlob(f.properties || {})
+          }));
+          selectedId.value = features.value[0]?.id ?? null;
+        } catch (err) {
+          error.value = err?.message ? `${err.message}.` : 'Unknown error.';
+        } finally {
+          loading.value = false;
+        }
+      };
 
-        const typeOptions = uniqueSorted('ClosureType');
-        const speciesOptions = uniqueSorted('Species');
-        const managerOptions = uniqueSorted('ManagedBy');
+      onMounted(load);
 
-        const hasActiveFilters = computed(() => search.value || typeFilter.value || speciesFilter.value || managerFilter.value);
-
-        const filteredFeatures = computed(() => {
-          const q = search.value.toLowerCase();
-          let list = features.value.filter((f) => {
-            if (typeFilter.value && normalize(f.props.ClosureType) !== typeFilter.value) return false;
-            if (speciesFilter.value && normalize(f.props.Species) !== speciesFilter.value) return false;
-            if (managerFilter.value && normalize(f.props.ManagedBy) !== managerFilter.value) return false;
-            if (q && !f.blob.includes(q)) return false;
-            return true;
-          });
-
-          const byDate = (a, b) => {
-            const da = parseDate(a.props.Date_From)?.getTime() ?? Number.POSITIVE_INFINITY;
-            const db = parseDate(b.props.Date_From)?.getTime() ?? Number.POSITIVE_INFINITY;
-            return da - db;
-          };
-          const byAcres = (a, b) => (Number(b.props.ACRES) || -Infinity) - (Number(a.props.ACRES) || -Infinity);
-          const byName = (a, b) => normalize(a.props.ClosureName).localeCompare(normalize(b.props.ClosureName));
-
-          if (sortBy.value === 'size') list = list.slice().sort(byAcres);
-          else if (sortBy.value === 'name') list = list.slice().sort(byName);
-          else list = list.slice().sort(byDate);
-
-          return list;
-        });
-
-        watch(filteredFeatures, (list) => {
-          if (!list.some((f) => f.id === selectedId.value)) {
-            selectedId.value = list[0]?.id ?? null;
+      const uniqueSorted = (key) => {
+        return computed(() => {
+          const values = new Set();
+          for (const f of features.value) {
+            const val = normalize(f.props[key]);
+            if (val) values.add(val);
           }
+          return [...values].sort((a, b) => a.localeCompare(b));
+        });
+      };
+
+      const typeOptions = uniqueSorted('FormationType');
+      const speciesOptions = uniqueSorted('AreaAccess');
+      const managerOptions = uniqueSorted('OWNER');
+      const statusOptions = computed(() => ['Open', 'Closed'].filter((s) => features.value.some((f) => statusLabel(f.props) === s)));
+      const statusCounts = computed(() => features.value.reduce((acc, f) => {
+        const label = statusLabel(f.props);
+        acc[label.toLowerCase()] = (acc[label.toLowerCase()] || 0) + 1;
+        return acc;
+      }, { open: 0, closed: 0 }));
+
+      const hasActiveFilters = computed(() => search.value || typeFilter.value || speciesFilter.value || managerFilter.value || statusFilter.value);
+
+      const filteredFeatures = computed(() => {
+        const q = search.value.toLowerCase();
+        let list = features.value.filter((f) => {
+          if (typeFilter.value && normalize(f.props.FormationType) !== typeFilter.value) return false;
+          if (speciesFilter.value && normalize(f.props.AreaAccess) !== speciesFilter.value) return false;
+          if (managerFilter.value && normalize(f.props.OWNER) !== managerFilter.value) return false;
+          if (statusFilter.value && statusLabel(f.props) !== statusFilter.value) return false;
+          if (q && !f.blob.includes(q)) return false;
+          return true;
         });
 
-        const selectedFeature = computed(() => filteredFeatures.value.find((f) => f.id === selectedId.value) || filteredFeatures.value[0] || features.value.find((f) => f.id === selectedId.value) || null);
-
-        const statusLabel = (props) => {
-          const active = normalize(props.EnactedClosure).toLowerCase() === 'yes';
-          const lifted = normalize(props.ClosureLifted).toLowerCase() === 'y';
-          if (lifted) return 'Lifted';
-          if (active) return 'Active';
-          return 'Inactive';
+        const byDate = (a, b) => {
+          const da = parseDate(a.props.Date_From)?.getTime() ?? Number.POSITIVE_INFINITY;
+          const db = parseDate(b.props.Date_From)?.getTime() ?? Number.POSITIVE_INFINITY;
+          return da - db;
         };
+        const byAcres = (a, b) => (Number(b.props.ACRES) || -Infinity) - (Number(a.props.ACRES) || -Infinity);
+        const byName = (a, b) => recordTitle(a.props).localeCompare(recordTitle(b.props));
 
-        const statusClass = (props) => {
-          const label = statusLabel(props);
-          if (label === 'Active') return 'good';
-          if (label === 'Lifted') return 'bad';
-          return 'warn';
-        };
+        if (sortBy.value === 'size') list = list.slice().sort(byAcres);
+        else if (sortBy.value === 'name') list = list.slice().sort(byName);
+        else list = list.slice().sort(byDate);
 
-        const sortLabel = computed(() => {
-          if (sortBy.value === 'size') return 'size';
-          if (sortBy.value === 'name') return 'name';
-          return 'start date';
-        });
+        return list;
+      });
 
-        const selectedFieldList = computed(() => {
-          const props = selectedFeature.value?.props || {};
-          return Object.keys(props).filter((k) => k !== 'Shape').join(', ');
-        });
+      watch(filteredFeatures, (list) => {
+        if (!list.some((f) => f.id === selectedId.value)) {
+          selectedId.value = list[0]?.id ?? null;
+        }
+      });
 
-        const resetFilters = () => {
-          search.value = '';
-          typeFilter.value = '';
-          speciesFilter.value = '';
-          managerFilter.value = '';
-          sortBy.value = 'date';
-        };
+      const selectedFeature = computed(() => filteredFeatures.value.find((f) => f.id === selectedId.value) || filteredFeatures.value[0] || features.value.find((f) => f.id === selectedId.value) || null);
 
-        return {
-          loading,
-          error,
-          features,
-          selectedId,
-          selectedFeature,
-          search,
-          typeFilter,
-          speciesFilter,
-          managerFilter,
-          sortBy,
-          typeOptions,
-          speciesOptions,
-          managerOptions,
-          hasActiveFilters,
-          filteredFeatures,
-          sortLabel,
-          selectedFieldList,
-          formatDateRange,
-          formatNumber,
-          shortText,
-          statusLabel,
-          statusClass,
-          resetFilters,
-        };
-      }
-    }).mount('#app');
-  </script>
+      const isTruthy = (value) => ['yes', 'y', 'true', '1'].includes(normalize(value).toLowerCase());
+
+      const statusLabel = (props) => {
+        const active = isTruthy(props.ClosureActive);
+        return active ? 'Closed' : 'Open';
+      };
+
+      const statusClass = (props) => {
+        const label = statusLabel(props);
+        if (label === 'Closed') return 'bad';
+        return 'good';
+      };
+
+      const sortLabel = computed(() => {
+        if (sortBy.value === 'size') return 'size';
+        if (sortBy.value === 'name') return 'name';
+        return 'start date';
+      });
+
+      const selectedFieldList = computed(() => {
+        const props = selectedFeature.value?.props || {};
+        return Object.keys(props).filter((k) => k !== 'Shape').join(', ');
+      });
+
+      const resetFilters = () => {
+        search.value = '';
+        typeFilter.value = '';
+        speciesFilter.value = '';
+        managerFilter.value = '';
+        sortBy.value = 'date';
+      };
+
+      return {
+        loading,
+        error,
+        features,
+        selectedId,
+        selectedFeature,
+        search,
+        typeFilter,
+        speciesFilter,
+        managerFilter,
+        statusFilter,
+        sortBy,
+        typeOptions,
+        speciesOptions,
+        managerOptions,
+        statusOptions,
+        statusCounts,
+        hasActiveFilters,
+        filteredFeatures,
+        sortLabel,
+        selectedFieldList,
+        recordTitle,
+        formatDateRange,
+        formatNumber,
+        shortText,
+        statusLabel,
+        statusClass,
+        resetFilters,
+      };
+    }
+  }).mount('#app');
+</script>
 </body>
 </html>
